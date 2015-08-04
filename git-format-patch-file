@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# Script used to create patches for each changed file
+# Usage: git format-patch-file <parent> <current>
+#
+
+files=$(git diff $1 $2 --name-only)
+folder=patches
+folder=$(echo $folder | sed -e 's/[\\\/\:\*\?\"\<\>\|]/_/g')
+
+rm -Rf $folder
+mkdir -p $folder
+
+for file in $files
+do
+    diff=$(git diff $1 $2 -- $file)
+    if [ "$diff" != "" ]; then
+        filename=$(echo $file.patch | sed -e 's/[\\\/\:\*\?\"\<\>\|]/_/g')
+        git diff $1 $2 -- $file > $folder/$filename
+        patches+="$folder/$filename
+"
+    fi
+done
+
+echo ""
+echo "################################################################"
+echo "Patches available in folder: $folder"
+echo ""
+echo "$patches"
+echo "################################################################"
+echo ""
+
+echo "Do you want me to apply the patches? [y/N]"
+read -n 1 -s apply
+if [ "$apply" == "y" ] || [ "$apply" == "Y" ]; then
+    for patch in $patches
+    do
+        echo "-- Applying: $patch"
+        output=$(git apply $patch 2>&1)
+        if [ "$output" != "" ]; then
+            failed+="$patch
+"
+        fi
+    done
+    
+    if [ "$failed" != "" ]; then
+        echo ""
+        echo "################################################################"
+        echo "The following patches were NOT applied:"
+        echo ""
+        echo "$failed"
+        echo "################################################################"
+        echo ""
+    fi
+    
+    echo "Do you want me to delete patch folder? [y/N]"
+    read -n 1 -s remove
+    if [ "$remove" == "y" ] || [ "$remove" == "Y" ]; then
+        rm -Rf $folder
+        echo "Folder has been removed!"
+    fi
+else
+  exit 0
+fi
+
